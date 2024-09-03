@@ -1,0 +1,5 @@
+*.db
+*.class
+/target/
+**/maves-status/
+**/generated-sources/
