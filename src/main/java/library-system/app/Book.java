@@ -11,12 +11,11 @@ import java.util.List;
 public class Book {
     private int id;
     private String title;
-    private String author;
+    private int authorId;
 
-
-    public Book(String title, String author) {
+    public Book(String title, int authorId) {
         this.title = title;
-        this.author = author;
+        this.authorId = authorId;
     }
 
     @Override 
@@ -24,11 +23,10 @@ public class Book {
         return "Book{" +
             "id=" + id +
             ", title='" + title + '\'' +
-            ", author='" + author + '\'' +
+            ", authorId=" + authorId +
             '}';
     }
 
-    // Getters and Setters
 
     public int getId() {
         return id;
@@ -46,49 +44,54 @@ public class Book {
         this.title = title;
     }
 
-    public String getAuthor() {
-        return author;
+    public int getAuthorId() {
+        return authorId;
     }
 
-    public void setAuthor(String author) {
-        this.author = author;
+    public void setAuthorId(int authorId) {
+        this.authorId = authorId;
     }
 
-    // Database Operations
+    public static void createTables() {
+        String createAuthorsTableSQL = "CREATE TABLE IF NOT EXISTS authors ("+
+                                       "id INTEGER PRIMARY KEY AUTOINCREMENT, "+
+                                       "name TEXT NOT NULL);";
 
-    public static void createTable() {
-        String sqlStr = "CREATE TABLE IF NOT EXISTS books ("+
-                        "id INTEGER PRIMARY KEY AUTOINCREMENT, "+
-                        "title TEXT NOT NULL, "+
-                        "author TEXT NOT NULL);";
+        String createBooksTableSQL = "CREATE TABLE IF NOT EXISTS books ("+
+                                     "id INTEGER PRIMARY KEY AUTOINCREMENT, "+
+                                     "title TEXT NOT NULL, "+
+                                     "author_id INTEGER NOT NULL, "+
+                                     "FOREIGN KEY (author_id) REFERENCES authors(id));";
 
         try (Connection connection = DatabaseHelper.connect();
-            PreparedStatement pstmt = connection.prepareStatement(sqlStr)) {
-        
-            pstmt.executeUpdate();
-            System.out.println("Table 'books' created successfully.");
+             PreparedStatement pstmt1 = connection.prepareStatement(createAuthorsTableSQL);
+             PreparedStatement pstmt2 = connection.prepareStatement(createBooksTableSQL)) {
+
+            pstmt1.executeUpdate();
+            pstmt2.executeUpdate();
+            System.out.println("Tables 'authors' and 'books' created successfully.");
 
         } catch (SQLException e) {
-            System.err.println("Error creating table.");
+            System.err.println("Erro ao criar as tables.");
             e.printStackTrace();
         }
     }
 
-    public static void insert(List<Book> books) {
-        String sqlStr = "INSERT INTO books (title, author) VALUES (?, ?);";
-        
+    public static void insertBooks(List<Book> books) {
+        String sqlStr = "INSERT INTO books (title, author_id) VALUES (?, ?);";
+
         try (Connection connection = DatabaseHelper.connect();
-            PreparedStatement pstmt = connection.prepareStatement(sqlStr)) {
-            
+             PreparedStatement pstmt = connection.prepareStatement(sqlStr)) {
+
             for (Book book : books) {
                 pstmt.setString(1, book.getTitle());
-                pstmt.setString(2, book.getAuthor());
+                pstmt.setInt(2, book.getAuthorId());
                 pstmt.addBatch();
             }
-            
+
             pstmt.executeBatch();
         } catch (SQLException e) {
-            System.err.println("Error inserting multiple books into database.");
+            System.err.println("Erro ao inserir diversos livros.");
             e.printStackTrace();
         }
     }
@@ -99,7 +102,7 @@ public class Book {
         List<Book> books = new ArrayList<>();
 
         try (Connection connection = DatabaseHelper.connect();
-            PreparedStatement pstmt = connection.prepareStatement(sqlStr)) {
+             PreparedStatement pstmt = connection.prepareStatement(sqlStr)) {
 
             pstmt.setString(1, "%" + searchString + "%");
             ResultSet rs = pstmt.executeQuery();
@@ -107,13 +110,13 @@ public class Book {
             while (rs.next()) {
                 int id = rs.getInt("id");
                 String title = rs.getString("title");
-                String author = rs.getString("author");
-                Book book = new Book(title, author);
+                int authorId = rs.getInt("author_id");
+                Book book = new Book(title, authorId);
                 book.setId(id);
                 books.add(book);
             }
         } catch (SQLException e) {
-            System.err.println("Error getting books from database.");
+            System.err.println("Erro ao puxar livros .");
             e.printStackTrace();
         }
 
@@ -121,56 +124,54 @@ public class Book {
     }
 
     public static void listBooks() {
-        String sqlStr = "SELECT * FROM books;";
+        String sqlStr = "SELECT b.title, a.name FROM books b " +
+                        "JOIN authors a ON b.author_id = a.id;";
 
         try (Connection connection = DatabaseHelper.connect();
-            PreparedStatement pstmt = connection.prepareStatement(sqlStr)) {
+             PreparedStatement pstmt = connection.prepareStatement(sqlStr)) {
 
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
-                System.out.println(rs.getString("title") + " - " + rs.getString("author")); 
+                System.out.println(rs.getString("title") + " - " + rs.getString("name"));
             }
         } catch (SQLException e) {
-            System.err.println("Error getting books from database");
+            System.err.println("Erro ao listar livros.");
             e.printStackTrace();
         }
     }
 
     public void update() {
-        String sqlStr = "UPDATE books SET title = ?, author = ? WHERE id = ?;";
-     
-        try (Connection connection = DatabaseHelper.connect();
-            PreparedStatement pstmt = connection.prepareStatement(sqlStr)) {
+        String sqlStr = "UPDATE books SET title = ?, author_id = ? WHERE id = ?;";
 
+        try (Connection connection = DatabaseHelper.connect();
+             PreparedStatement pstmt = connection.prepareStatement(sqlStr)) {
 
             pstmt.setString(1, this.title);
-            pstmt.setString(2, this.author);
+            pstmt.setInt(2, this.authorId);
             pstmt.setInt(3, this.id);
 
             pstmt.executeUpdate();
-        } catch(SQLException e) {
-            System.err.println("Error updating the book");
+        } catch (SQLException e) {
+            System.err.println("Erro ao atualizar");
             e.printStackTrace();
         }
     }
 
     public static void delete(int id) {
         String sqlStr = "DELETE FROM books WHERE id = ?;";
-        
+
         try (Connection connection = DatabaseHelper.connect();
-            PreparedStatement pstmt = connection.prepareStatement(sqlStr)) {
-            
+             PreparedStatement pstmt = connection.prepareStatement(sqlStr)) {
+
             pstmt.setInt(1, id);
             int rowsAffected = pstmt.executeUpdate();
             if (rowsAffected > 0) {
-                System.out.println("Book with ID: " + id + " deleted");
+                System.out.println("Livro: " + id + " excluido.");
             } else {
-                System.out.println("No book found with ID " + id);
+                System.out.println("nenhum livro encontrado." );
             }
-            
-            System.out.println(rowsAffected + " rows affected");
         } catch (SQLException e) {
-            System.err.println("Error deleting book from database.");
+            System.err.println("Erro ao excluir.");
             e.printStackTrace();
         }
     }
